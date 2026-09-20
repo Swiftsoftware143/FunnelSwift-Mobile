@@ -33,6 +33,7 @@ export default function KineticCardsScreen({ route, navigation }: any) {
   const [qrs, setQrs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [planNotice, setPlanNotice] = useState<string | null>(null);
   const initialTab = route?.params?.tab === 'qrs' ? 'qrs' : 'cards';
   const [activeTab, setActiveTab] = useState<'cards' | 'qrs'>(initialTab);
   const [fullscreenQr, setFullscreenQr] = useState<string | null>(null);
@@ -43,10 +44,19 @@ export default function KineticCardsScreen({ route, navigation }: any) {
 
   async function fetchData() {
     try {
-      const [cardsRes, qrsRes]: [any, any] = await Promise.all([
-        http.getKineticCards().catch(() => [] as any),
-        http.getKineticQrCodes().catch(() => ({ data: [] })),
-      ]);
+      // Load the two lists independently: a plan-gated 402 on cards must not blank the QR
+      // list, and it must explain itself instead of rendering a silent "No cards yet".
+      let cardsRes: any = [];
+      let notice: string | null = null;
+      try {
+        cardsRes = await http.getKineticCards();
+      } catch (e: any) {
+        notice = e?.status === 402
+          ? 'Your current plan does not include Kinetic Cards. Upgrade to create your card.'
+          : e?.message || 'Could not load your cards.';
+      }
+      const qrsRes = await http.getKineticQrCodes().catch(() => ({ data: [] }));
+      setPlanNotice(notice);
       setCards(Array.isArray(cardsRes) ? cardsRes : cardsRes?.data || []);
       setQrs(Array.isArray(qrsRes?.data) ? qrsRes.data : []);
     } catch {}
@@ -123,9 +133,11 @@ export default function KineticCardsScreen({ route, navigation }: any) {
           {cards.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="flash-outline" size={64} color={colors.textMuted} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No cards yet</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                {planNotice ? 'Cards unavailable' : 'No cards yet'}
+              </Text>
               <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-                Create cards in the FunnelSwift web dashboard
+                {planNotice || 'Create cards in the FunnelSwift web dashboard'}
               </Text>
             </View>
           ) : (

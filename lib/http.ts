@@ -134,7 +134,9 @@ export function forgotPassword(email: string) {
 export function resetPassword(token: string, password: string) {
   return request<{ message: string }>('/auth/reset-password', {
     method: 'POST',
-    body: JSON.stringify({ token, password }),
+    // The API expects `new_password`; sending `password` failed deserialisation with 422,
+    // so "reset password" could never succeed from the app.
+    body: JSON.stringify({ token, new_password: password }),
   });
 }
 
@@ -250,13 +252,26 @@ export function changePassword(currentPassword: string, newPassword: string) {
 }
 
 export function getSettings() {
-  return request<Record<string, any>>('/settings');
+  // The API returns rows ([{ key, value }]); callers want { [key]: value }. Spreading the
+  // array gave an object keyed by index, so saved preferences never showed up in the UI.
+  return request<any[]>('/settings').then(rows =>
+    Array.isArray(rows)
+      ? rows.reduce<Record<string, any>>((acc, r) => {
+          if (r && typeof r.key === 'string') acc[r.key] = r.value;
+          return acc;
+        }, {})
+      : {},
+  );
 }
 
 export function updateSettings(data: Record<string, any>) {
+  // PUT /settings takes exactly one { key, value } pair, but callers pass { [key]: value }.
+  // Sending the bare object made the API reject every save with 422, so notification
+  // preferences silently never persisted (the UI even reverted them on error).
+  const [key, value] = Object.entries(data)[0] ?? ['', null];
   return request<Record<string, any>>('/settings', {
     method: 'PUT',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ key, value }),
   });
 }
 
