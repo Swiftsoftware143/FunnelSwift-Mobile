@@ -26,7 +26,7 @@ npx expo start
 - React Native + Expo
 - JWT auth via FunnelSwift API (`funnelswift.net/api/v1`)
 - SecureStore for credentials
-- Postgres on Hetzner VPS (same DB as FunnelSwift web)
+- Postgres on Miami VPS (same DB as FunnelSwift web)
 
 ## Architecture
 
