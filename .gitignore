@@ -1,5 +1,6 @@
 node_modules/
 .expo/
+.gradle-home/
 dist/
 npm-debug.*
 *.jks

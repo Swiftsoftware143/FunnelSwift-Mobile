@@ -16,6 +16,7 @@ import LeadsScreen from './app/screens/LeadsScreen';
 import ProfileScreen from './app/screens/ProfileScreen';
 import LeadDetailScreen from './app/screens/LeadDetailScreen';
 import KineticCardsScreen from './app/screens/KineticCardsScreen';
+import IntegrationsScreen from './app/screens/IntegrationsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -90,6 +91,11 @@ export default function App() {
                 name="LeadDetail" 
                 component={LeadDetailScreen}
                 options={{ title: 'Lead Details' }}
+              />
+              <Stack.Screen
+                name="Integrations"
+                component={IntegrationsScreen}
+                options={{ title: 'Integrations' }}
               />
             </Stack.Navigator>
           </NavigationContainer>

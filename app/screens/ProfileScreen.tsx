@@ -45,6 +45,12 @@ export default function ProfileScreen({ navigation }: any) {
       onPress: () => setShowAccountSettings(true),
     },
     {
+      // Integration Center (fleet standard 2026-09-20) — Settings → Integrations.
+      icon: 'git-network' as const,
+      title: 'Integrations',
+      onPress: () => navigation.navigate('Integrations'),
+    },
+    {
       icon: 'notifications' as const,
       title: 'Notifications',
       onPress: () => setShowNotifications(true),
