@@ -15,7 +15,18 @@ import { useTheme } from '../../lib/ThemeContext';
 import * as http from '../../lib/http';
 
 interface Props {
-  onComplete: (data: { name: string; email: string; phone: string; company: string; title: string; summary: string }) => void;
+  onComplete: (data: {
+    name: string;
+    email: string;
+    phone: string;
+    company: string;
+    title: string;
+    summary: string;
+    // The profile this lead came from, and whether the server actually fetched it.
+    // `inferred` is true when the name was read out of the URL slug rather than looked up.
+    profile_url: string;
+    inferred: boolean;
+  }) => void;
   onClose: () => void;
 }
 
@@ -42,19 +53,26 @@ export default function LinkedInGrab({ onComplete, onClose }: Props) {
 
       if (!result.name && !result.email) {
         Alert.alert(
-          'No Data Found',
-          'Could not extract contact information from this LinkedIn profile. The profile may be private or the URL may be incorrect.'
+          'No Name In That URL',
+          result.note ||
+            'That does not look like a LinkedIn profile URL. It should look like https://linkedin.com/in/username'
         );
         return;
       }
 
+      // The server reads the name out of the URL slug and states its provenance in
+      // `source`; it does not fetch the profile (LinkedIn does not permit that). So we
+      // forward the profile URL itself, and say plainly whether the name was inferred,
+      // instead of silently passing a guess off as a looked-up contact.
       onComplete({
         name: result.name || '',
-        email: result.email || result.email_guess || '',
+        email: result.email || '',
         phone: result.phone || '',
-        company: result.company || result.headline || '',
-        title: result.title || result.headline || '',
+        company: result.company || '',
+        title: result.title || '',
         summary: result.summary || '',
+        profile_url: result.profile_url || trimmed,
+        inferred: result.source === 'linkedin-url-slug',
       });
     } catch (err: any) {
       Alert.alert(
@@ -89,7 +107,9 @@ export default function LinkedInGrab({ onComplete, onClose }: Props) {
           Paste a LinkedIn Profile URL
         </Text>
         <Text style={[styles.desc, { color: colors.textMuted }]}>
-          Enter any public LinkedIn profile URL and we'll extract name, company, title, and more — instantly saved as a lead.
+          We take the name from the profile URL and keep the profile link on the lead.
+          LinkedIn does not allow us to pull the profile itself, so company, title, email
+          and phone are yours to fill in.
         </Text>
 
         <TextInput
@@ -125,7 +145,8 @@ export default function LinkedInGrab({ onComplete, onClose }: Props) {
         </TouchableOpacity>
 
         <Text style={[styles.note, { color: colors.textMuted }]}>
-          Works with public profiles. Private profiles or expired URLs will show an error.
+          Any URL shaped like /in/first-last-name works. A URL with no name in it cannot be
+          used — capture that lead by hand.
         </Text>
       </View>
     </KeyboardAvoidingView>

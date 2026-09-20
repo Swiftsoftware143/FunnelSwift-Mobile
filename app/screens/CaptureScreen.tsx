@@ -499,10 +499,18 @@ export default function CaptureScreen() {
             if (data.phone) scanned.phone = data.phone;
             if (data.company) scanned.company = data.company;
             if (data.title) scanned.title = data.title;
+            // The source profile used to be thrown away: the grab carried it, the lead
+            // never stored it, so there was no record of where the lead came from.
+            if (data.profile_url) scanned.social = data.profile_url;
             const keys = Object.keys(scanned);
             setActiveFields([...new Set([...activeFields, ...keys])]);
             setFieldValues(f => ({ ...f, ...scanned }));
-            Alert.alert('Profile Grabbed', 'LinkedIn data loaded. Review and save.');
+            Alert.alert(
+              'LinkedIn Link Added',
+              data.inferred
+                ? 'Name read from the profile link, and the link is saved on the lead. Company, title, email and phone were not available — add them below if you need them.'
+                : 'LinkedIn data loaded. Review and save.'
+            );
           }}
         />
       </Modal>
