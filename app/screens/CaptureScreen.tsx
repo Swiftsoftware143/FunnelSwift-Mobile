@@ -494,7 +494,13 @@ export default function CaptureScreen() {
           onComplete={(data) => {
             setShowLinkedIn(false);
             const scanned: Record<string, string> = {};
-            if (data.name) scanned.first_name = data.name;
+            // The whole name used to go into `first_name` alone, so a grabbed lead showed
+            // "Amara Okafor" in the First Name column with Last Name empty. Split it.
+            if (data.name) {
+              const parts = data.name.trim().split(/\s+/).filter(Boolean);
+              if (parts.length) scanned.first_name = parts[0];
+              if (parts.length > 1) scanned.last_name = parts.slice(1).join(' ');
+            }
             if (data.email) scanned.email = data.email;
             if (data.phone) scanned.phone = data.phone;
             if (data.company) scanned.company = data.company;
