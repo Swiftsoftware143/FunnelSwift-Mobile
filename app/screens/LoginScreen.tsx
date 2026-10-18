@@ -29,7 +29,6 @@ export default function LoginScreen({ navigation }: any) {
   const [showPassword, setShowPassword] = useState(false);
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const [regPassword, setRegPassword] = useState('');
   const [regTenant, setRegTenant] = useState('');
 
   const { signIn, savedAccounts, switchAccount, removeSavedAccount, signOut } = useAuth();
@@ -86,18 +85,15 @@ export default function LoginScreen({ navigation }: any) {
   }
 
   async function handleRegister() {
-    if (!regName || !regEmail || !regPassword) {
-      Alert.alert('Error', 'Name, email, and password are required');
-      return;
-    }
-    if (regPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    if (!regName || !regEmail) {
+      Alert.alert('Error', 'Name and email are required');
       return;
     }
 
     setLoading(true);
     try {
-      const result = await http.register(regEmail, regPassword, regName, regTenant || `${regName}'s Business`);
+      // No password is collected: the server mints one and emails it (David's signup model).
+      const result = await http.register(regEmail, regName, regTenant);
       await http.setToken(result.token);
       navigation.replace('Main');
     } catch (err: any) {
@@ -169,19 +165,6 @@ export default function LoginScreen({ navigation }: any) {
             onChangeText={setRegEmail}
             autoCapitalize="none"
             keyboardType="email-address"
-          />
-
-          <TextInput
-            style={[styles.input, {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              color: colors.text,
-            }]}
-            placeholder="Password"
-            placeholderTextColor={colors.textMuted}
-            value={regPassword}
-            onChangeText={setRegPassword}
-            secureTextEntry
           />
 
           <TextInput

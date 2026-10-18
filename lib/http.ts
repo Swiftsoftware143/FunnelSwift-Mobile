@@ -112,10 +112,22 @@ export function login(email: string, password: string) {
   });
 }
 
-export function register(email: string, password: string, name: string, tenantName: string) {
-  return request<{ token: string; user: any }>('/auth/register', {
+// David's signup model (2026-09-29): the customer gives NAME + EMAIL. The system generates the
+// first password and emails it, and the user sets their own later. This used to post to
+// `/auth/register`, which demands a password of at least 6 characters — so the mobile app was the
+// only door in the product that asked a new customer to invent one. `/auth/signup` is the door that
+// implements the model (it mints and mails the password) and returns the same `{ token, user }`
+// shape this client reads, so nothing downstream changes. `tenantName` is optional; the server
+// falls back to "<name>'s Workspace".
+export function register(email: string, name: string, tenantName?: string) {
+  return request<{ token: string; user: any }>('/auth/signup', {
     method: 'POST',
-    body: JSON.stringify({ email, password, name, tenant_name: tenantName }),
+    body: JSON.stringify({
+      email,
+      name,
+      ...(tenantName && tenantName.trim() ? { tenant_name: tenantName.trim() } : {}),
+      source: 'mobile',
+    }),
   });
 }
 
