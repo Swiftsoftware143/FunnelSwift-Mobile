@@ -71,7 +71,7 @@ export default function ProfileScreen({ navigation }: any) {
       onPress: () => {
         Alert.alert(
           'Help & Support',
-          'For support inquiries, please email:\nsupport@funnelswift.net\n\nDocumentation:\nhttps://funnelswift.net/docs'
+          'For support inquiries, please email:\nsupport@funnelswift.net\n\nDocumentation:\nhttps://funnelswift.net/guide'
         );
       },
     },
