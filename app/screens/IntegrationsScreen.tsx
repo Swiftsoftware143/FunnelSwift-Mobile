@@ -151,7 +151,7 @@ export default function IntegrationsScreen({ navigation }: any) {
   }
 
   function onDisconnect(provider: string, name: string) {
-    Alert.alert('Disconnect', `Disconnect ${name} for this workspace?`, [
+    Alert.alert('Disconnect', `Disconnect ${name} for this account?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Disconnect',
@@ -416,7 +416,7 @@ export default function IntegrationsScreen({ navigation }: any) {
     >
       <Text style={[css.intro, { color: colors.textMuted }]}>
         Connect the tools this app captures leads with. Connection state is read live from
-        FunnelSwift — API keys are sent to your FunnelSwift workspace and are never stored on this
+        FunnelSwift — API keys are sent to your FunnelSwift account and are never stored on this
         device.
       </Text>
 
@@ -433,7 +433,7 @@ export default function IntegrationsScreen({ navigation }: any) {
 
       {providers.length === 0 ? (
         <Text style={[css.empty, { color: colors.textMuted }]}>
-          No integrations in this workspace's catalogue yet.
+          No integrations in this account's catalogue yet.
         </Text>
       ) : (
         <>
