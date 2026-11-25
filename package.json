@@ -1,6 +1,6 @@
 {
   "name": "funnelswift-mobile",
-  "version": "1.0.21",
+  "version": "1.0.24",
   "main": "expo/AppEntry.js",
   "scripts": {
     "start": "expo start",

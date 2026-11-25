@@ -10,8 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../lib/ThemeContext';
 import { useAuth } from '../../lib/AuthContext';
 import * as http from '../../lib/http';
@@ -31,6 +33,64 @@ export default function AccountSettingsModal({ onClose }: Props) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  // The picture is the account's picture on the SERVER (the same one the web console shows), so it
+  // is read back from /auth/me here rather than kept on the device: an upload made on web appears
+  // here, and a removal made here is what the console shows next.
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await http.getMe();
+        if (!cancelled) setAvatarUrl(http.absoluteMediaUrl(me?.avatar_url));
+      } catch {
+        // Leave the initial-letter placeholder; a failed read never blocks the form.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handlePickPhoto() {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Photo access needed', 'Allow photos so you can choose a profile picture.');
+        return;
+      }
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (picked.canceled || !picked.assets?.length) return;
+
+      setAvatarBusy(true);
+      const asset = picked.assets[0];
+      const result = await http.uploadAvatar(asset.uri, asset.mimeType || 'image/jpeg');
+      setAvatarUrl(http.absoluteMediaUrl(result?.avatar_url));
+    } catch (err: any) {
+      Alert.alert('Photo not saved', err?.message || 'The picture could not be uploaded.');
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  async function handleRemovePhoto() {
+    setAvatarBusy(true);
+    try {
+      await http.deleteAvatar();
+      setAvatarUrl(null);
+    } catch (err: any) {
+      Alert.alert('Not removed', err?.message || 'The picture could not be removed.');
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
 
   async function handleSaveProfile() {
     if (!name.trim()) {
@@ -94,6 +154,42 @@ export default function AccountSettingsModal({ onClose }: Props) {
       <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
         {/* Profile Section */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Profile</Text>
+
+        <View style={[styles.field, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.label, { color: colors.textMuted }]}>Profile Picture</Text>
+          <View style={styles.pictureRow}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.picture} />
+            ) : (
+              <View style={[styles.picture, styles.pictureEmpty, { backgroundColor: colors.primary }]}>
+                <Text style={styles.pictureInitial}>
+                  {(name || email || 'U').trim().charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.pictureActions}>
+              <TouchableOpacity
+                style={[styles.pictureButton, { backgroundColor: colors.primary, opacity: avatarBusy ? 0.6 : 1 }]}
+                onPress={handlePickPhoto}
+                disabled={avatarBusy}
+              >
+                {avatarBusy ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.pictureButtonText}>{avatarUrl ? 'Change Photo' : 'Add Photo'}</Text>
+                )}
+              </TouchableOpacity>
+              {avatarUrl ? (
+                <TouchableOpacity onPress={handleRemovePhoto} disabled={avatarBusy}>
+                  <Text style={[styles.pictureRemove, { color: colors.error }]}>Remove</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+          <Text style={[styles.hint, { color: colors.textMuted }]}>
+            This is the same picture your account shows on the web console.
+          </Text>
+        </View>
 
         <View style={[styles.field, { backgroundColor: colors.surface }]}>
           <Text style={[styles.label, { color: colors.textMuted }]}>Name</Text>
@@ -213,6 +309,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   hint: { fontSize: 11, marginTop: 4, fontStyle: 'italic' },
+  pictureRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 8 },
+  picture: { width: 64, height: 64, borderRadius: 32 },
+  pictureEmpty: { justifyContent: 'center', alignItems: 'center' },
+  pictureInitial: { color: '#fff', fontSize: 26, fontWeight: '700' },
+  pictureActions: { marginLeft: 16, flex: 1, alignItems: 'flex-start' },
+  pictureButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 110,
+    alignItems: 'center',
+  },
+  pictureButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  pictureRemove: { fontSize: 13, marginTop: 8, fontWeight: '600' },
   saveButton: {
     height: 48,
     borderRadius: 10,

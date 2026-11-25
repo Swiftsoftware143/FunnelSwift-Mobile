@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,19 +6,66 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
-import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../lib/AuthContext';
 import { useTheme } from '../../lib/ThemeContext';
+import * as http from '../../lib/http';
 import AccountSettingsModal from '../components/AccountSettingsModal';
 import NotificationsModal from '../components/NotificationsModal';
+import appJson from '../../app.json';
+
+// The version this build actually is. It used to be the literal "v1.0.5" on this screen while the
+// shipped app was 1.0.23 — a customer reading their own profile was told a version six months old,
+// which is exactly what a support call starts with. app.json is the single source both the build and
+// the store read.
+const APP_VERSION: string = (appJson as any)?.expo?.version ?? '';
 
 export default function ProfileScreen({ navigation }: any) {
   const { user, isSuperAdmin, signOut } = useAuth();
   const { colors } = useTheme();
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  // The profile picture and the workspace's plan both live on the server and are read from
+  // /auth/me — never cached on the device, so a picture uploaded on web appears here, and a plan
+  // changed in the console is what this screen says.
+  const [me, setMe] = useState<any>(null);
+  const [loadingMe, setLoadingMe] = useState(true);
+
+  const refreshMe = useCallback(async () => {
+    try {
+      const fresh = await http.getMe();
+      setMe(fresh);
+    } catch {
+      // A failed read leaves the screen on what sign-in already knew; it never invents a plan.
+    } finally {
+      setLoadingMe(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshMe();
+  }, [refreshMe]);
+
+  const avatarUri = http.absoluteMediaUrl(me?.avatar_url);
+  const displayName = me?.name || user?.name || user?.email || 'User';
+  const displayEmail = me?.email || user?.email || '';
+  const initials = (displayName || 'U').trim().charAt(0).toUpperCase();
+
+  // The plan, in the customer's own words. A workspace holding a real subscription reads that
+  // tier's name; one with no subscription is held to the install's default tier by the gates, so
+  // the screen names that tier and marks it as the default rather than inventing a level.
+  const planName: string | null = me?.plan_name || null;
+  const effectiveName: string | null = me?.plan_effective_name || null;
+  const planLabel = planName
+    ? planName
+    : effectiveName
+      ? `${effectiveName} (default)`
+      : me
+        ? 'No plan assigned'
+        : '';
 
   async function handleSignOut() {
     Alert.alert(
@@ -80,15 +127,24 @@ export default function ProfileScreen({ navigation }: any) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.profileHeader, { backgroundColor: colors.surface }]}>
-        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-          <Text style={styles.avatarText}>
-            {user?.email?.charAt(0).toUpperCase() || 'U'}
-          </Text>
-        </View>
-        <Text style={[styles.name, { color: colors.text }]}>
-          {user?.name || user?.email || 'User'}
-        </Text>
-        <Text style={[styles.email, { color: colors.textMuted }]}>{user?.email}</Text>
+        {avatarUri ? (
+          <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+        )}
+        <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
+        <Text style={[styles.email, { color: colors.textMuted }]}>{displayEmail}</Text>
+        {loadingMe ? (
+          <ActivityIndicator size="small" color={colors.textMuted} style={{ marginTop: 4 }} />
+        ) : (
+          planLabel !== '' && (
+            <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
+              <Text style={[styles.badgeText, { color: colors.primary }]}>{planLabel}</Text>
+            </View>
+          )
+        )}
         {isSuperAdmin && (
           <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
             <Text style={[styles.badgeText, { color: colors.primary }]}>Super Admin</Text>
@@ -119,12 +175,24 @@ export default function ProfileScreen({ navigation }: any) {
       </TouchableOpacity>
 
       <Text style={[styles.version, { color: colors.textMuted }]}>
-        FunnelSwift Mobile v1.0.5
+        FunnelSwift Mobile {APP_VERSION ? 'v' + APP_VERSION : ''}
       </Text>
 
       {/* Modals */}
-      <Modal visible={showAccountSettings} animationType="slide" onRequestClose={() => setShowAccountSettings(false)}>
-        <AccountSettingsModal onClose={() => setShowAccountSettings(false)} />
+      <Modal
+        visible={showAccountSettings}
+        animationType="slide"
+        onRequestClose={() => setShowAccountSettings(false)}
+      >
+        <AccountSettingsModal
+          onClose={() => {
+            setShowAccountSettings(false);
+            // The picture and the name are written by that modal, so the header must re-read them
+            // rather than keep showing the values it loaded when the screen opened.
+            setLoadingMe(true);
+            refreshMe();
+          }}
+        />
       </Modal>
 
       <Modal visible={showNotifications} animationType="slide" onRequestClose={() => setShowNotifications(false)}>
@@ -144,6 +212,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 12,
+    backgroundColor: '#00000010',
   },
   avatarText: { fontSize: 32, fontWeight: 'bold', color: '#fff' },
   name: { fontSize: 20, fontWeight: '700', marginBottom: 4 },

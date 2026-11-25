@@ -263,6 +263,69 @@ export function changePassword(currentPassword: string, newPassword: string) {
   });
 }
 
+// Profile picture — the SAME store the web console writes (FunnelSwift `user_avatars` row, streamed
+// back by the public GET /auth/avatar/:user_id). Until now the mobile app had no picture at all: it
+// painted the account's initial letter even for a customer whose picture was already on the server,
+// so a profile set up on web looked empty here. `avatar_url` arrives on /auth/me as a PATH
+// ("/api/v1/auth/avatar/<id>?v=<stamp>"), which is why it is resolved against the origin rather than
+// API_BASE (API_BASE already carries /api/v1).
+const API_ORIGIN = 'https://funnelswift.net';
+
+export function absoluteMediaUrl(path?: string | null): string | null {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_ORIGIN}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
+/**
+ * Upload the caller's own profile picture.
+ *
+ * Deliberately NOT routed through `request()`: that helper pins
+ * `Content-Type: application/json`, and a multipart body must let fetch set the boundary itself.
+ * The backend takes the first multipart part that carries a filename (2 MB cap, PNG/JPEG/GIF/WebP
+ * sniffed from the bytes) and answers `{ status, avatar_url }`.
+ */
+export async function uploadAvatar(uri: string, mimeType = 'image/jpeg'): Promise<{ status?: string; avatar_url: string }> {
+  const token = await getToken();
+  const form = new FormData();
+  // RN's FormData turns this object into a real file part; `name` must be present or the server
+  // skips the part (it only accepts a part that carries a filename).
+  form.append('file', { uri, name: 'avatar.jpg', type: mimeType } as any);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+  try {
+    const response = await fetch(`${API_BASE}/auth/avatar`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+      signal: controller.signal,
+    });
+    if (response.status === 401) {
+      await removeToken();
+      throw new ApiError('Unauthorized', 401);
+    }
+    if (!response.ok) {
+      let message = `Upload failed (${response.status})`;
+      try {
+        const body = await response.json();
+        message = body.error || body.message || message;
+      } catch {}
+      throw new ApiError(message, response.status);
+    }
+    return response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Remove the caller's own picture — the profile then falls back to its initial letter. */
+export function deleteAvatar() {
+  return request<{ status: string; removed: number; avatar_url: string }>('/auth/avatar', {
+    method: 'DELETE',
+  });
+}
+
 export function getSettings() {
   // The API returns rows ([{ key, value }]); callers want { [key]: value }. Spreading the
   // array gave an object keyed by index, so saved preferences never showed up in the UI.
